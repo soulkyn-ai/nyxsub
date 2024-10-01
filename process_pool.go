@@ -56,17 +56,17 @@ func (p *Process) Start() {
 	_cmd := exec.Command(p.cmdStr, p.cmdArgs...)
 	stdin, err := _cmd.StdinPipe()
 	if err != nil {
-		p.logger.Error().Err(err).Msgf("[minerva|%s] Failed to get stdin pipe for process", p.name)
+		p.logger.Error().Err(err).Msgf("[nyxsub|%s] Failed to get stdin pipe for process", p.name)
 		return
 	}
 	stdout, err := _cmd.StdoutPipe()
 	if err != nil {
-		p.logger.Error().Err(err).Msgf("[minerva|%s] Failed to get stdout pipe for process", p.name)
+		p.logger.Error().Err(err).Msgf("[nyxsub|%s] Failed to get stdout pipe for process", p.name)
 		return
 	}
 	stderr, err := _cmd.StderrPipe() // Capture stderr pipe
 	if err != nil {
-		p.logger.Error().Err(err).Msgf("[minerva|%s] Failed to get stderr pipe for process", p.name)
+		p.logger.Error().Err(err).Msgf("[nyxsub|%s] Failed to get stderr pipe for process", p.name)
 		return
 	}
 	p.mutex.Lock()
@@ -86,7 +86,7 @@ func (p *Process) Start() {
 		p.readStderr()
 	}()
 	if err := p.cmd.Start(); err != nil {
-		p.logger.Error().Err(err).Msgf("[minerva|%s] Failed to start process", p.name)
+		p.logger.Error().Err(err).Msgf("[nyxsub|%s] Failed to start process", p.name)
 		return
 	}
 }
@@ -99,7 +99,7 @@ func (p *Process) Stop() {
 	p.cmd.Process.Kill()
 	p.wg.Wait() // Wait for goroutines to finish
 	p.cleanupChannelsAndResources()
-	p.logger.Info().Msgf("[minerva|%s] Process stopped", p.name)
+	p.logger.Info().Msgf("[nyxsub|%s] Process stopped", p.name)
 }
 
 // cleanupChannelsAndResources closes the inputQueue and outputQueue channels and sets the cmd, stdin, stdout, ctx, cancel, and wg to nil.
@@ -114,7 +114,7 @@ func (p *Process) cleanupChannelsAndResources() {
 
 // Restart stops the process and starts it again.
 func (p *Process) Restart() {
-	p.logger.Info().Msgf("[minerva|%s] Restarting process", p.name)
+	p.logger.Info().Msgf("[nyxsub|%s] Restarting process", p.name)
 	p.mutex.Lock()
 	p.restarts = p.restarts + 1
 	p.mutex.Unlock()
@@ -145,11 +145,11 @@ func (p *Process) readStderr() {
 	for {
 		line, err := p.stderr.ReadString('\n')
 		if err != nil {
-			p.logger.Error().Err(err).Msgf("[minerva|%s] Failed to read stderr", p.name)
+			p.logger.Error().Err(err).Msgf("[nyxsub|%s] Failed to read stderr", p.name)
 			return
 		}
 		if line != "" && line != "\n" {
-			p.logger.Error().Msgf("[minerva|%s|stderr] %s", p.name, line)
+			p.logger.Error().Msgf("[nyxsub|%s|stderr] %s", p.name, line)
 		}
 	}
 }
@@ -170,12 +170,12 @@ func (p *Process) WaitForReadyScan() {
 
 			var response map[string]interface{}
 			if err := json.Unmarshal([]byte(line), &response); err != nil {
-				p.logger.Warn().Msgf("[minerva|%s] Non JSON message received: '%s'", p.name, line)
+				p.logger.Warn().Msgf("[nyxsub|%s] Non JSON message received: '%s'", p.name, line)
 				continue
 			}
 			switch response["type"] {
 			case "ready":
-				p.logger.Info().Msgf("[minerva|%s] Process is ready", p.name)
+				p.logger.Info().Msgf("[nyxsub|%s] Process is ready", p.name)
 				responseChan <- response
 				return
 			}
@@ -187,10 +187,10 @@ func (p *Process) WaitForReadyScan() {
 		p.SetBusy(0)
 		return
 	case err := <-errChan:
-		p.logger.Error().Err(err).Msgf("[minerva|%s] Failed to read line", p.name)
+		p.logger.Error().Err(err).Msgf("[nyxsub|%s] Failed to read line", p.name)
 		p.Restart()
 	case <-time.After(p.initTimeout):
-		p.logger.Error().Msgf("[minerva|%s] Communication timed out", p.name)
+		p.logger.Error().Msgf("[nyxsub|%s] Communication timed out", p.name)
 		p.Restart()
 	}
 }
@@ -198,14 +198,14 @@ func (p *Process) WaitForReadyScan() {
 func (p *Process) Communicate(cmd map[string]interface{}) (map[string]interface{}, error) {
 	// Send command
 	if err := p.stdin.Encode(cmd); err != nil {
-		p.logger.Error().Err(err).Msgf("[minerva|%s] Failed to send command", p.name)
+		p.logger.Error().Err(err).Msgf("[nyxsub|%s] Failed to send command", p.name)
 		p.Restart()
 		return nil, err
 	}
 
 	// Log the command sent
 	jsonCmd, _ := json.Marshal(cmd)
-	p.logger.Debug().Msgf("[minerva|%s] Command sent: %v", p.name, string(jsonCmd))
+	p.logger.Debug().Msgf("[nyxsub|%s] Command sent: %v", p.name, string(jsonCmd))
 
 	responseChan := make(chan map[string]interface{}, 1)
 	errChan := make(chan error, 1)
@@ -217,7 +217,7 @@ func (p *Process) Communicate(cmd map[string]interface{}) (map[string]interface{
 			close(responseChan)
 			close(errChan)
 		}()
-		p.logger.Debug().Msgf("[minerva|%s] Waiting for response", p.name)
+		p.logger.Debug().Msgf("[nyxsub|%s] Waiting for response", p.name)
 		for {
 			select {
 			case <-ctx.Done():
@@ -226,7 +226,7 @@ func (p *Process) Communicate(cmd map[string]interface{}) (map[string]interface{
 			default:
 				line, err := p.stdout.ReadString('\n')
 				if err != nil {
-					p.logger.Error().Err(err).Msgf("[minerva|%s] Failed to read line", p.name)
+					p.logger.Error().Err(err).Msgf("[nyxsub|%s] Failed to read line", p.name)
 					errChan <- err
 					return
 				}
@@ -236,7 +236,7 @@ func (p *Process) Communicate(cmd map[string]interface{}) (map[string]interface{
 
 				var response map[string]interface{}
 				if err := json.Unmarshal([]byte(line), &response); err != nil {
-					p.logger.Warn().Msgf("[minerva|%s] Non JSON message received: '%s'", p.name, line)
+					p.logger.Warn().Msgf("[nyxsub|%s] Non JSON message received: '%s'", p.name, line)
 					continue
 				}
 
@@ -256,7 +256,7 @@ func (p *Process) Communicate(cmd map[string]interface{}) (map[string]interface{
 	case response := <-responseChan:
 		return response, nil
 	case err := <-errChan:
-		p.logger.Error().Err(err).Msgf("[minerva|%s] Error during communication", p.name)
+		p.logger.Error().Err(err).Msgf("[nyxsub|%s] Error during communication", p.name)
 		p.Restart()
 		return nil, err
 	}
